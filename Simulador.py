@@ -1,7 +1,9 @@
 import time
 # Importar as classes dos outros ficheiros
-from Ambientes import AmbienteFarol, AmbienteLabirinto
-from Agentes import AgenteFarol, AgenteLabirinto
+from Ambiente_Labirinto import AmbienteLabirinto
+from Agente_Labirinto import AgenteLabirinto
+from Ambiente_Farol import AmbienteFarol
+from Agente_Farol import AgenteFarol
 
 
 class Simulador:
@@ -9,7 +11,7 @@ class Simulador:
         self.ambiente = None
         self.agente = None
         self.passos = 0
-        self.max_passos = 100
+        self.max_passos = 200
         self.modo = ""
 
     # Este método escolhe qual o problema que vamos correr [cite: 20]
@@ -66,7 +68,7 @@ class Simulador:
                 terminou = True
 
             self.passos += 1
-            time.sleep(0.2)  # Atraso para visualização
+            time.sleep(0.5)  # Atraso para visualização
 
         if not terminou:
             print("--- FIM: Limite de passos atingido. ---")
@@ -76,8 +78,7 @@ class Simulador:
 if __name__ == "__main__":
     sim = Simulador()
 
-    # AQUI TU ESCOLHES QUAL QUERES CORRER:
-    # sim.cria("farol")      # Corre o problema 1
-    sim.cria("labirinto")  # Corre o problema 3
+    sim.cria("farol")      # Corre o problema 1
+    #sim.cria("labirinto")  # Corre o problema 3
 
     sim.executa()

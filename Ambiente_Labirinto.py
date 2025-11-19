@@ -1,26 +1,26 @@
 # Classes auxiliares apenas para o Labirinto
 class Parede:
     def __init__(self, x, y):
-        self.name = "Parede";
-        self.x = x;
+        self.name = "Parede"
+        self.x = x
         self.y = y
 
 
 class Vazio:
     def __init__(self, x, y):
-        self.name = "Vazio";
-        self.x = x;
+        self.name = "Vazio"
+        self.x = x
         self.y = y
 
 
 class Objetivo:
     def __init__(self, x, y):
-        self.name = "Saida";
-        self.x = x;
+        self.name = "Saida"
+        self.x = x
         self.y = y
 
 
-class Ambiente_Labirinto:
+class AmbienteLabirinto:
     def __init__(self):
         self.size = 8
         self.agente_pos = (0, 0)

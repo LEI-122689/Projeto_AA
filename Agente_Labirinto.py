@@ -1,7 +1,7 @@
 import random
 
 
-class Agente_Labirinto:
+class AgenteLabirinto:
     def __init__(self):
         self.recompensa_acumulada = 0
         self.ultima_observacao = None
