@@ -13,10 +13,13 @@ class AmbienteFarol:
         # Contador interno para controlar a rotação da luz
         self.tempo_luz = 0
 
+    def reset(self):
+        """ Reseta a posição do agente para o início do episódio (0, 0). """
+        self.agente_pos = (0, 0)
+        self.tempo_luz = 0 
+
     def observacaoPara(self):
         # O Agente continua a receber o vetor distância até ao farol
-        # (Poderíamos adicionar aqui se o agente está "iluminado" ou não, 
-        # mas vamos manter simples por agora)
         ax, ay = self.agente_pos
         fx, fy = self.farol_x, self.farol_y
         return (fx - ax, fy - ay)
