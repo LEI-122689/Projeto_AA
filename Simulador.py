@@ -27,7 +27,7 @@ class Simulador:
 
         elif tipo_problema == "labirinto":
             print("-> A carregar Problema 3: Labirinto (Q-Learning)")
-            self.ambiente = AmbienteLabirinto()  # Aquele teu código do labirinto
+            self.ambiente = AmbienteLabirinto()
             self.agente = AgenteLabirinto()
             # Informar o agente da sua posição inicial (Estado)
             self.agente.atualiza_posicao(self.ambiente.agente_pos)
@@ -36,6 +36,7 @@ class Simulador:
             raise Exception("Problema desconhecido! Escolhe 'farol' ou 'labirinto'.")
 
     # Método para executar um único ciclo de tentativa (episódio)
+    # A CORREÇÃO ESTÁ AQUI: renderizar=False por defeito
     def executa_episodio(self, renderizar=False):
         # 1. Resetar o estado do ambiente e do agente para um novo episódio
         self.passos = 0
@@ -86,8 +87,10 @@ class Simulador:
                 terminou = True
 
             self.passos += 1
+
+            # Só faz pausa se estivermos a ver (renderizar=True)
             if renderizar:
-                time.sleep(0.05)
+                time.sleep(0.2)
 
         if renderizar and not terminou:
             print("--- FIM: Limite de passos atingido. ---")
@@ -109,27 +112,46 @@ class Simulador:
         self.agente.learning_mode = True
 
         print(f"--- Início da Simulação: {self.modo.upper()} ({num_episodios} Episódios de Aprendizagem) ---")
+        print("A treinar... (aguarde)")
 
-        # Loop de Episódios
+        # Loop de Episódios (TREINO)
         for episodio in range(1, num_episodios + 1):
-            # Renderizar apenas o último episódio (após a aprendizagem)
-            render_agora = (episodio == num_episodios)
-
-            sucesso, passos, recompensa_total = self.executa_episodio(renderizar=render_agora)
+            # --- ALTERAÇÃO AQUI: ---
+            # Coloquei renderizar=False fixo para o treino ser rápido.
+            # Como tens o Teste no fim, não precisas de ver o último episódio de treino.
+            sucesso, passos, recompensa_total = self.executa_episodio(renderizar=False)
 
             # Mostrar o progresso
-            if episodio % (num_episodios // 10) == 0 or episodio == num_episodios or episodio == 1:
+            if episodio % (num_episodios // 10) == 0 or episodio == 1:
                 print(
-                    f"Episódio {episodio}/{num_episodios} | Sucesso: {sucesso} | Passos: {passos} | Recompensa Total: {recompensa_total:.2f} | Epsilon: {self.agente.epsilon:.4f}")
+                    f"Episódio {episodio}/{num_episodios} | Passos: {passos} | Recompensa: {recompensa_total:.2f} | Epsilon: {self.agente.epsilon:.4f}")
 
-        print("--- FIM: Simulação Concluída. ---")
+        print("--- FIM: Treino Concluído. ---")
+
+        # MODO DE TESTE (DEMONSTRAÇÃO)
+        print("\n" + "=" * 40)
+        print(" A INICIAR MODO DE TESTE (DEMONSTRAÇÃO) ")
+        print("=" * 40)
+        time.sleep(1)  # Pausa para leitura
+
+        # Desligar a aprendizagem e a curiosidade
+        self.agente.learning_mode = False
+        self.agente.epsilon = 0.0
+
+        # Agora sim, renderizar=True para veres o resultado final
+        sucesso, passos, recompensa = self.executa_episodio(renderizar=True)
+
+        if sucesso:
+            print(f"\n RESULTADO: SUCESSO! O Agente resolveu em {passos} passos.")
+        else:
+            print(f"\n RESULTADO: FALHOU. O Agente não encontrou o objetivo.")
 
 
 # Exemplo de uso:
 if __name__ == "__main__":
     sim = Simulador()
 
-    sim.cria("farol")  # Corre o problema 1 com Q-Learning
-    # sim.cria("labirinto")
+    #sim.cria("farol")  # Corre o problema 1 com Q-Learning
+    sim.cria("labirinto")
 
     sim.executa()
