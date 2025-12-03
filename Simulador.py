@@ -1,9 +1,14 @@
 import time
-# Importar as classes dos outros ficheiros
+import numpy as np
+import copy
+import random
+
+# IMPORTS
 from Ambiente_Labirinto import AmbienteLabirinto
 from Agente_Labirinto import AgenteLabirinto
 from Ambiente_Farol import AmbienteFarol
 from Agente_Farol import AgenteFarol
+from Agente_Novelty import AgenteNovelty
 
 
 class Simulador:
@@ -11,147 +16,180 @@ class Simulador:
         self.ambiente = None
         self.agente = None
         self.passos = 0
-        self.max_passos = 200  # Limite de passos por episódio
+        self.max_passos = 100
         self.modo = ""
+        self.populacao = []
 
-    # Este método escolhe qual o problema que vamos correr
     def cria(self, tipo_problema):
         self.modo = tipo_problema
 
         if tipo_problema == "farol":
-            print("-> A carregar Problema 1: Farol (Q-Learning)")
+            print("-> Carregando Farol (Q-Learning)")
             self.ambiente = AmbienteFarol()
             self.agente = AgenteFarol()
-            # Informar o agente do estado inicial (vetor)
             self.agente.observacao(self.ambiente.observacaoPara())
 
         elif tipo_problema == "labirinto":
-            print("-> A carregar Problema 3: Labirinto (Q-Learning)")
+            print("-> Carregando Labirinto (Q-Learning)")
             self.ambiente = AmbienteLabirinto()
             self.agente = AgenteLabirinto()
-            # Informar o agente da sua posição inicial (Estado)
             self.agente.atualiza_posicao(self.ambiente.agente_pos)
 
-        else:
-            raise Exception("Problema desconhecido! Escolhe 'farol' ou 'labirinto'.")
 
-    # Método para executar um único ciclo de tentativa (episódio)
-    # A CORREÇÃO ESTÁ AQUI: renderizar=False por defeito
+        elif tipo_problema == "novelty":
+            print("-> Carregando Labirinto (Evolutivo - Novelty Search)")
+            self.ambiente = AmbienteLabirinto()
+            self.populacao = [AgenteNovelty() for _ in range(50)]
+            self.agente = self.populacao[0]
+        else:
+            raise Exception("Modo desconhecido. Escolhe: 'farol', 'labirinto' ou 'novelty'")
+
     def executa_episodio(self, renderizar=False):
-        # 1. Resetar o estado do ambiente e do agente para um novo episódio
         self.passos = 0
         terminou = False
 
-        if self.modo == "labirinto":
-            # Recria o ambiente (para labirintos estáticos, isto é um reset)
+        # Reset adequado a cada tipo
+        if "labirinto" in self.modo or "novelty" in self.modo:
             self.ambiente = AmbienteLabirinto()
             self.agente.recompensa_acumulada = 0
-            # O Agente Labirinto usa a posição absoluta como estado
-            self.agente.atualiza_posicao(self.ambiente.agente_pos)
+            if hasattr(self.agente, "atualiza_posicao"):
+                self.agente.atualiza_posicao(self.ambiente.agente_pos)
+            if hasattr(self.agente, "observacao"):
+                self.agente.observacao(self.ambiente.observacaoPara())
 
         elif self.modo == "farol":
-            # Usa o método reset() e reinicia o estado
             self.ambiente.reset()
             self.agente.recompensa_acumulada = 0
-            # O Agente Farol usa a observação inicial para definir o estado (Direção)
             self.agente.observacao(self.ambiente.observacaoPara())
 
-        # O Ciclo de Simulação
+        # Loop Principal
         while not terminou and self.passos < self.max_passos:
             if renderizar:
                 print(f"\nPasso: {self.passos}")
                 self.ambiente.render()
 
-            # 2. Percepção
+            # Ciclo Perceção-Ação
             percepcao = self.ambiente.observacaoPara()
             self.agente.observacao(percepcao)
 
-            # 3. Deliberação e Ação
             acao = self.agente.age()
-
-            # 4. Execução e Recompensa
             recompensa = self.ambiente.agir(acao)
 
-            # ATUALIZAÇÃO SÓ PARA O LABIRINTO: Comunica a nova posição (estado)
-            if self.modo == "labirinto":
+            # Atualizações
+            if hasattr(self.agente, "atualiza_posicao"):
                 self.agente.atualiza_posicao(self.ambiente.agente_pos)
 
-            # 5. Aprendizagem/Avaliação
             self.agente.avaliacaoEstadoAtual(recompensa)
 
-            # 6. Verificar se terminou
             if self.ambiente.jogo_terminou():
-                if renderizar:
-                    print("--- SUCESSO! Objetivo alcançado. ---")
-                    self.ambiente.render()
                 terminou = True
+                if renderizar:
+                    print("SUCESSO!")
+                    self.ambiente.render()
 
             self.passos += 1
-
-            # Só faz pausa se estivermos a ver (renderizar=True)
-            if renderizar:
-                time.sleep(0.2)
-
-        if renderizar and not terminou:
-            print("--- FIM: Limite de passos atingido. ---")
+            if renderizar: time.sleep(0.1)
 
         return terminou, self.passos, self.agente.recompensa_acumulada
 
-    # Método principal para correr múltiplos episódios de aprendizagem
+    # --- LÓGICA DE NOVIDADE ---
+    def calcular_novidade(self, arquivo_posicoes):
+        k = 5
+        for agente in self.populacao:
+            meu_x, meu_y = agente.posicao_final
+            distancias = []
+            todos_comparaveis = self.populacao + arquivo_posicoes
+
+            for outro in todos_comparaveis:
+                if outro == agente: continue
+                if isinstance(outro, tuple):
+                    ox, oy = outro
+                else:
+                    ox, oy = outro.posicao_final
+                d = np.sqrt((meu_x - ox) ** 2 + (meu_y - oy) ** 2)
+                distancias.append(d)
+
+            distancias.sort()
+            vizinhos_proximos = distancias[:k]
+
+            if len(vizinhos_proximos) > 0:
+                agente.score_novidade = sum(vizinhos_proximos) / len(vizinhos_proximos)
+            else:
+                agente.score_novidade = 0
+
     def executa(self):
-        if self.ambiente is None or self.agente is None:
-            print("Erro: Tens de correr sim.cria() primeiro!")
-            return
+        if self.ambiente is None: return
 
-        # Configuração: Número de episódios
-        if self.modo == "farol":
-            num_episodios = 1000
+        if self.modo != "novelty":
+            # --- MODO CLÁSSICO (Q-Learning) ---
+            # AQUI ESTÃO OS PRINTS DE VOLTA
+            num_episodios = 1000 if self.modo == "farol" else 500
+
+            self.agente.learning_mode = True
+            print(f"--- A CORRER: {self.modo} ({num_episodios} Episódios) ---")
+
+            for ep in range(1, num_episodios + 1):
+                sucesso, passos, rec = self.executa_episodio(renderizar=False)
+
+                # Print Detalhado a cada 10%
+                if ep % (num_episodios // 10) == 0 or ep == 1:
+                    print(
+                        f"Ep {ep}/{num_episodios} | Sucesso: {sucesso} | Passos: {passos} | Recompensa: {rec:.2f} | Epsilon: {self.agente.epsilon:.4f}")
+
+            print("\n=== DEMONSTRAÇÃO FINAL ===")
+            self.agente.learning_mode = False
+            self.executa_episodio(renderizar=True)
+
         else:
-            num_episodios = 500
+            # --- MODO EVOLUTIVO (NOVELTY SEARCH) ---
+            print("--- A INICIAR EVOLUÇÃO (NOVELTY SEARCH) ---")
+            geracoes = 50
+            arquivo_novidade = []
 
-        self.agente.learning_mode = True
+            melhor_agente_global = None
 
-        print(f"--- Início da Simulação: {self.modo.upper()} ({num_episodios} Episódios de Aprendizagem) ---")
-        print("A treinar... (aguarde)")
+            for g in range(geracoes):
+                sucessos_na_geracao = 0
 
-        # Loop de Episódios (TREINO)
-        for episodio in range(1, num_episodios + 1):
-            # --- ALTERAÇÃO AQUI: ---
-            # Coloquei renderizar=False fixo para o treino ser rápido.
-            # Como tens o Teste no fim, não precisas de ver o último episódio de treino.
-            sucesso, passos, recompensa_total = self.executa_episodio(renderizar=False)
+                for individuo in self.populacao:
+                    self.agente = individuo
+                    sucesso, passos, _ = self.executa_episodio(renderizar=False)
+                    individuo.posicao_final = self.ambiente.agente_pos
 
-            # Mostrar o progresso
-            if episodio % (num_episodios // 10) == 0 or episodio == 1:
-                print(
-                    f"Episódio {episodio}/{num_episodios} | Passos: {passos} | Recompensa: {recompensa_total:.2f} | Epsilon: {self.agente.epsilon:.4f}")
+                    if sucesso:
+                        sucessos_na_geracao += 1
+                        melhor_agente_global = copy.deepcopy(individuo)
+                        print(f"--> SOLUÇÃO ENCONTRADA NA GERAÇÃO {g}!")
 
-        print("--- FIM: Treino Concluído. ---")
+                if sucessos_na_geracao > 0: break
 
-        # MODO DE TESTE (DEMONSTRAÇÃO)
-        print("\n" + "=" * 40)
-        print(" A INICIAR MODO DE TESTE (DEMONSTRAÇÃO) ")
-        print("=" * 40)
-        time.sleep(1)  # Pausa para leitura
+                self.calcular_novidade(arquivo_novidade)
+                arquivo_novidade.append(self.populacao[0].posicao_final)
 
-        # Desligar a aprendizagem e a curiosidade
-        self.agente.learning_mode = False
-        self.agente.epsilon = 0.0
+                self.populacao.sort(key=lambda x: x.score_novidade, reverse=True)
+                elite = self.populacao[:10]
 
-        # Agora sim, renderizar=True para veres o resultado final
-        sucesso, passos, recompensa = self.executa_episodio(renderizar=True)
+                nova_populacao = []
+                while len(nova_populacao) < 20:
+                    pai = random.choice(elite)
+                    filho = copy.deepcopy(pai)
+                    filho.mutate(taxa=0.2)
+                    nova_populacao.append(filho)
 
-        if sucesso:
-            print(f"\n RESULTADO: SUCESSO! O Agente resolveu em {passos} passos.")
-        else:
-            print(f"\n RESULTADO: FALHOU. O Agente não encontrou o objetivo.")
+                self.populacao = nova_populacao
+                print(f"Geração {g} | Max Novidade: {elite[0].score_novidade:.2f}")
+
+            print("\n=== DEMONSTRAÇÃO DO MELHOR AGENTE EVOLUÍDO ===")
+            if melhor_agente_global:
+                self.agente = melhor_agente_global
+                self.executa_episodio(renderizar=True)
+            else:
+                print("A evolução não encontrou a saída a tempo.")
 
 
-# Exemplo de uso:
 if __name__ == "__main__":
     sim = Simulador()
-
-    #sim.cria("farol")  # Corre o problema 1 com Q-Learning
-    sim.cria("labirinto")
-
+    #sim.cria("farol")
+    #sim.cria("labirinto")
+    sim.cria("novelty")
     sim.executa()

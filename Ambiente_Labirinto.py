@@ -1,23 +1,14 @@
-# Classes auxiliares apenas para o Labirinto
+# Classes auxiliares
 class Parede:
-    def __init__(self, x, y):
-        self.name = "Parede"
-        self.x = x
-        self.y = y
+    def __init__(self, x, y): self.name = "Parede"; self.x = x; self.y = y
 
 
 class Vazio:
-    def __init__(self, x, y):
-        self.name = "Vazio"
-        self.x = x
-        self.y = y
+    def __init__(self, x, y): self.name = "Vazio"; self.x = x; self.y = y
 
 
 class Objetivo:
-    def __init__(self, x, y):
-        self.name = "Saida"
-        self.x = x
-        self.y = y
+    def __init__(self, x, y): self.name = "Saida"; self.x = x; self.y = y
 
 
 class AmbienteLabirinto:
@@ -35,6 +26,10 @@ class AmbienteLabirinto:
         ]
 
     def get_coisa_em(self, x, y):
+        # Verifica limites (se sair do mapa é parede)
+        if not (0 <= x < self.size and 0 <= y < self.size):
+            return Parede(x, y)
+
         if (self.objetivo.x, self.objetivo.y) == (x, y):
             return self.objetivo
         for p in self.paredes:
@@ -42,24 +37,38 @@ class AmbienteLabirinto:
                 return p
         return Vazio(x, y)
 
-    # Agente vê o objeto na posição atual
+    # --- AQUI ESTAVA O PROBLEMA ---
+    # Agora retorna um dicionário com o que está nas 4 direções
+    # O Agente Novelty precisa disto. O Q-Learning ignora isto (usa coords).
     def observacaoPara(self):
-        x, y = self.agente_pos
-        return self.get_coisa_em(x, y)
+        cx, cy = self.agente_pos
+        visao = {}
+
+        # Mapa de direções
+        vizinhos = {
+            "N": (0, -1),  # Norte
+            "S": (0, 1),  # Sul
+            "W": (-1, 0),  # Oeste (West)
+            "E": (1, 0)  # Este (East)
+        }
+
+        for direcao, (dx, dy) in vizinhos.items():
+            # Vê o que está na casa ao lado
+            obj = self.get_coisa_em(cx + dx, cy + dy)
+            # Guarda o nome ("Parede", "Vazio", "Saida")
+            visao[direcao] = obj.name
+
+        return visao
 
     def agir(self, accao):
         curr_x, curr_y = self.agente_pos
         dx, dy = accao
         new_x, new_y = curr_x + dx, curr_y + dy
 
-        # Verificar limites
-        if not (0 <= new_x < self.size and 0 <= new_y < self.size):
-            return -10
-
         coisa = self.get_coisa_em(new_x, new_y)
 
         if isinstance(coisa, Parede):
-            return -5  # Bateu na parede
+            return -10  # Bateu
 
         self.agente_pos = (new_x, new_y)
 
