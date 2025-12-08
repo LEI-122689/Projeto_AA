@@ -1,3 +1,5 @@
+from Interface_Ambiente import Ambiente
+
 # Classes auxiliares
 class Parede:
     def __init__(self, x, y): self.name = "Parede"; self.x = x; self.y = y
@@ -13,16 +15,59 @@ class Objetivo:
 
 class AmbienteLabirinto:
     def __init__(self):
-        self.size = 8
+        self.size = 20
         self.agente_pos = (0, 0)
         self.objetivo = Objetivo(7, 7)
 
         # Mapa de Paredes
+        # Mapa de Paredes (20x20)
+        self.size = 20  # NOVA DIMENSÃO
+        self.objetivo = Objetivo(19, 19)  # NOVO OBJETIVO
+
         self.paredes = [
-            Parede(1, 0), Parede(1, 1), Parede(1, 2),
-            Parede(3, 2), Parede(3, 3), Parede(3, 4), Parede(3, 5),
-            Parede(5, 1), Parede(5, 2), Parede(5, 6), Parede(5, 7),
-            Parede(6, 1)
+            # ----------------------------------------------------
+            # PAREDES HORIZONTAIS
+            # ----------------------------------------------------
+
+            # Bloqueia Linha 1
+            Parede(2, 1), Parede(3, 1), Parede(4, 1), Parede(5, 1), Parede(6, 1), Parede(7, 1),
+
+            # Bloqueia Linha 3 (Barreira Principal)
+            Parede(0, 3), Parede(1, 3), Parede(2, 3), Parede(3, 3), Parede(4, 3), Parede(5, 3),
+            Parede(7, 3), Parede(8, 3), Parede(9, 3), Parede(10, 3), Parede(11, 3),
+            Parede(13, 3), Parede(14, 3), Parede(15, 3), Parede(16, 3), Parede(17, 3), Parede(18, 3),
+
+            # Bloqueia Linha 5
+            Parede(1, 5), Parede(2, 5), Parede(4, 5), Parede(5, 5), Parede(6, 5), Parede(7, 5),
+            Parede(9, 5), Parede(10, 5), Parede(12, 5), Parede(13, 5), Parede(15, 5), Parede(16, 5),
+            Parede(18, 5), Parede(19, 5),
+
+            # Bloqueia Linha 7
+            Parede(0, 7), Parede(1, 7), Parede(3, 7), Parede(5, 7), Parede(6, 7), Parede(8, 7),
+            Parede(10, 7), Parede(11, 7), Parede(13, 7), Parede(15, 7), Parede(17, 7), Parede(18, 7),
+
+            # Bloqueia Linha 9 (Barreira Central)
+            Parede(2, 9), Parede(3, 9), Parede(4, 9), Parede(5, 9), Parede(7, 9), Parede(8, 9),
+            Parede(9, 9), Parede(11, 9), Parede(12, 9), Parede(14, 9), Parede(15, 9), Parede(16, 9),
+            Parede(18, 9), Parede(19, 9),
+
+            # Bloqueia Linha 11
+            Parede(0, 11), Parede(1, 11), Parede(3, 11), Parede(5, 11), Parede(6, 11), Parede(8, 11),
+            Parede(10, 11), Parede(11, 11), Parede(13, 11), Parede(15, 11), Parede(16, 11), Parede(18, 11),
+
+            # Bloqueia Linha 13
+            Parede(2, 13), Parede(3, 13), Parede(4, 13), Parede(5, 13), Parede(7, 13), Parede(8, 13),
+            Parede(9, 13), Parede(11, 13), Parede(12, 13), Parede(14, 13), Parede(15, 13), Parede(17, 13),
+            Parede(18, 13), Parede(19, 13),
+
+            # Bloqueia Linha 15
+            Parede(0, 15), Parede(1, 15), Parede(3, 15), Parede(5, 15), Parede(6, 15), Parede(8, 15),
+            Parede(10, 15), Parede(11, 15), Parede(13, 15), Parede(15, 15), Parede(16, 15), Parede(18, 15),
+
+            # Bloqueia Linha 17 (Penúltima)
+            Parede(2, 17), Parede(3, 17), Parede(4, 17), Parede(5, 17), Parede(7, 17), Parede(8, 17),
+            Parede(9, 17), Parede(11, 17), Parede(12, 17), Parede(14, 17), Parede(15, 17), Parede(17, 17),
+            Parede(18, 17),
         ]
 
     def get_coisa_em(self, x, y):

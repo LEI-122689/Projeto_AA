@@ -1,3 +1,4 @@
+from Interface_Ambiente import Ambiente
 class AmbienteFarol:
     def __init__(self):
         # Tamanho impar (21x11) para termos um "centro" exato

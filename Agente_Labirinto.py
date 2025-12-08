@@ -1,4 +1,5 @@
 import random
+from Interface_Agente import Agente
 
 # Definir os parâmetros e a Q-table
 ALPHA = 0.1  # Taxa de Aprendizagem

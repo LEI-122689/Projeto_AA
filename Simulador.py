@@ -1,14 +1,18 @@
 import time
-import numpy as np
-import copy
-import random
-
-# IMPORTS
+import sys
+# Importar as classes dos outros ficheiros
 from Ambiente_Labirinto import AmbienteLabirinto
 from Agente_Labirinto import AgenteLabirinto
 from Ambiente_Farol import AmbienteFarol
 from Agente_Farol import AgenteFarol
 from Agente_Novelty import AgenteNovelty
+
+# Importar o visualizador Pygame
+try:
+    from Pygame_Simulador import VisualizadorPygame
+except ImportError:
+    print("Aviso: Pygame não instalado. Instale com 'pip install pygame' para ter GUI.")
+    VisualizadorPygame = None
 
 
 class Simulador:
@@ -16,7 +20,9 @@ class Simulador:
         self.ambiente = None
         self.agente = None
         self.passos = 0
-        self.max_passos = 100
+        self.max_passos = 200
+        self.visualizador = None
+        self.fps = 10  # FPS padrão para visualização
         self.modo = ""
         self.populacao = []
 
@@ -30,6 +36,7 @@ class Simulador:
             self.agente.observacao(self.ambiente.observacaoPara())
 
         elif tipo_problema == "labirinto":
+            print("-> A carregar Problema 3: Labirinto (Q-Learning)")
             print("-> Carregando Labirinto (Q-Learning)")
             self.ambiente = AmbienteLabirinto()
             self.agente = AgenteLabirinto()
@@ -44,10 +51,19 @@ class Simulador:
         else:
             raise Exception("Modo desconhecido. Escolhe: 'farol', 'labirinto' ou 'novelty'")
 
+        if self.visualizador:
+            self.visualizador.fechar()
+        self.visualizador = None
+
     def executa_episodio(self, renderizar=False):
         self.passos = 0
         terminou = False
 
+        # Resetar ambiente e agente
+        if self.modo == "labirinto":
+            self.ambiente = AmbienteLabirinto()
+            self.agente.recompensa_acumulada = 0
+            self.agente.atualiza_posicao(self.ambiente.agente_pos)
         # Reset adequado a cada tipo
         if "labirinto" in self.modo or "novelty" in self.modo:
             self.ambiente = AmbienteLabirinto()
@@ -62,12 +78,32 @@ class Simulador:
             self.agente.recompensa_acumulada = 0
             self.agente.observacao(self.ambiente.observacaoPara())
 
+        # Inicializar o Pygame
+        if renderizar and VisualizadorPygame:
+            self.visualizador = VisualizadorPygame(self.ambiente, self.modo, self.max_passos, self.fps)
+
+        # O Ciclo de Simulação
         # Loop Principal
         while not terminou and self.passos < self.max_passos:
-            if renderizar:
-                print(f"\nPasso: {self.passos}")
-                self.ambiente.render()
 
+            # --- Desenho Pygame ---
+            if self.visualizador:
+                sucesso = self.ambiente.jogo_terminou()
+                self.visualizador.desenha(self.passos, self.agente.recompensa_acumulada, terminou, sucesso,
+                                          self.agente.epsilon)
+
+            # 1. Percepção
+            percepcao = self.ambiente.observacaoPara()
+            self.agente.observacao(percepcao)
+
+            # 2. Deliberação e Ação
+            acao = self.agente.age()
+
+            # 3. Execução e Recompensa
+            recompensa = self.ambiente.agir(acao)
+
+            # 4. Atualização de Posição (só para Labirinto)
+            if self.modo == "labirinto":
             # Ciclo Perceção-Ação
             percepcao = self.ambiente.observacaoPara()
             self.agente.observacao(percepcao)
@@ -83,6 +119,22 @@ class Simulador:
 
             if self.ambiente.jogo_terminou():
                 terminou = True
+
+            self.passos += 1
+
+        # --- Desenho final e fecho do Pygame ---
+        sucesso = self.ambiente.jogo_terminou()
+        if self.visualizador:
+            self.visualizador.desenha(self.passos, self.agente.recompensa_acumulada, terminou, sucesso,
+                                      self.agente.epsilon)
+            time.sleep(1.0)
+
+            try:
+                self.visualizador.fechar()
+            except Exception:
+                pass
+
+            self.visualizador = None
                 if renderizar:
                     print("SUCESSO!")
                     self.ambiente.render()
@@ -90,8 +142,12 @@ class Simulador:
             self.passos += 1
             if renderizar: time.sleep(0.1)
 
-        return terminou, self.passos, self.agente.recompensa_acumulada
+        return sucesso, self.passos, self.agente.recompensa_acumulada
 
+    def executa(self, num_episodios=1000):
+        if self.ambiente is None or self.agente is None:
+            print("Erro: Tens de correr sim.cria() primeiro!")
+            return
     # --- LÓGICA DE NOVIDADE ---
     def calcular_novidade(self, arquivo_posicoes):
         k = 5
@@ -151,6 +207,9 @@ class Simulador:
             for g in range(geracoes):
                 sucessos_na_geracao = 0
 
+        # Loop de Episódios
+        for episodio in range(1, num_episodios + 1):
+            render_agora = (episodio == num_episodios)
                 for individuo in self.populacao:
                     self.agente = individuo
                     sucesso, passos, _ = self.executa_episodio(renderizar=False)
@@ -161,6 +220,9 @@ class Simulador:
                         melhor_agente_global = copy.deepcopy(individuo)
                         print(f"--> SOLUÇÃO ENCONTRADA NA GERAÇÃO {g}!")
 
+            if episodio % (num_episodios // 10) == 0 or episodio == num_episodios or episodio == 1:
+                print(
+                    f"Episódio {episodio}/{num_episodios} | Sucesso: {sucesso} | Passos: {passos} | Recompensa Total: {recompensa_total:.2f} | Epsilon: {self.agente.epsilon:.4f}")
                 if sucessos_na_geracao > 0: break
 
                 self.calcular_novidade(arquivo_novidade)
@@ -186,9 +248,9 @@ class Simulador:
             else:
                 print("A evolução não encontrou a saída a tempo.")
 
-
 if __name__ == "__main__":
     sim = Simulador()
+     sim.fps = 5
     #sim.cria("farol")
     #sim.cria("labirinto")
     sim.cria("novelty")
