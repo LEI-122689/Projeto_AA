@@ -1,5 +1,5 @@
 import random
-
+from Interface_Agente import Agente
 # --- Parâmetros de Q-Learning ---
 ALPHA = 0.1  # Taxa de Aprendizagem
 GAMMA = 0.9  # Fator de Desconto
