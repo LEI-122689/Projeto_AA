@@ -147,7 +147,7 @@ class Simulador:
 # Exemplo de uso:
 if __name__ == "__main__":
     sim = Simulador()
-    sim.cria("farol", dificuldade="dificil")
-    # sim.cria("labirinto")
+    #sim.cria("farol", dificuldade="dificil")
+    sim.cria("labirinto")
     sim.fps = 10
     sim.executa()
