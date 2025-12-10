@@ -37,11 +37,18 @@ class Simulador:
             self.max_passos = 500
 
         elif tipo_problema == "labirinto":
-            print("-> A carregar Problema 3: Labirinto (Q-Learning)")
-            self.ambiente = AmbienteLabirinto()
+            print(f"-> A carregar Problema 3: Labirinto (Dificuldade: {dificuldade.upper()})")
+            # --- AQUI ESTÁ A ÚNICA ALTERAÇÃO ---
+            self.ambiente = AmbienteLabirinto(dificuldade)
+            # -----------------------------------
             self.agente = AgenteLabirinto()
             self.agente.atualiza_posicao(self.ambiente.agente_pos)
-            self.max_passos = 200
+
+            # Pequeno ajuste de passos para não falhar no dificil
+            if dificuldade == "dificil":
+                self.max_passos = 500
+            else:
+                self.max_passos = 200
 
         else:
             raise Exception("Problema desconhecido! Escolhe 'farol' ou 'labirinto'.")
@@ -146,7 +153,7 @@ class Simulador:
 # Exemplo de uso:
 if __name__ == "__main__":
     sim = Simulador()
-    #sim.cria("farol", dificuldade="dificil")
-    sim.cria("labirinto")
-    sim.fps = 5
+    # sim.cria("farol", dificuldade="dificil")
+    sim.cria("labirinto", "dificil")
+    sim.fps = 10
     sim.executa()

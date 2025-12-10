@@ -1,12 +1,10 @@
 from Interface_Ambiente import Ambiente
-from typing import List, Tuple, Any
+from typing import List, Tuple
 
 
-# --- Classes Auxiliares (Elementos do Ambiente) ---
+# --- Classes Auxiliares ---
 
 class Parede:
-    """ Representa um bloco que bloqueia o movimento. """
-
     def __init__(self, x, y):
         self.name = "Parede"
         self.x = x
@@ -14,8 +12,6 @@ class Parede:
 
 
 class Vazio:
-    """ Representa um bloco de caminho aberto. """
-
     def __init__(self, x, y):
         self.name = "Vazio"
         self.x = x
@@ -23,19 +19,31 @@ class Vazio:
 
 
 class Objetivo:
-    """ Representa o bloco de saída/meta. """
-
     def __init__(self, x, y):
         self.name = "Saida"
         self.x = x
         self.y = y
 
 
-# --- Classe Principal: AmbienteLabirinto ---
+# --- Classe Principal ---
 
 class AmbienteLabirinto(Ambiente):
-    # Convenção: 0: Vazio, 1: Parede, 2:
-    MAPA_PADRAO_15X15_EXEMPLO = [
+    # 1. MAPA FÁCIL (10x10)
+    MAPA_FACIL = [
+        [0, 1, 0, 0, 0, 1, 0, 0, 0, 0],
+        [0, 1, 0, 1, 0, 1, 0, 1, 1, 0],
+        [0, 0, 0, 1, 0, 0, 0, 1, 0, 0],
+        [1, 1, 1, 1, 0, 1, 1, 1, 0, 1],
+        [0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+        [0, 1, 1, 1, 1, 1, 0, 1, 1, 1],
+        [0, 0, 0, 1, 0, 0, 0, 0, 0, 0],
+        [1, 1, 0, 1, 0, 1, 0, 1, 1, 0],
+        [0, 0, 0, 0, 0, 1, 0, 0, 1, 0],
+        [1, 1, 1, 1, 1, 1, 0, 0, 0, 2]  # Saída no canto
+    ]
+
+    # 2. MAPA MÉDIO (15x15) - O TEU ORIGINAL
+    MAPA_MEDIO = [
         [0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
         [0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1],
         [1, 1, 1, 1, 1, 1, 1, 0, 1, 0, 1, 1, 1, 0, 1],
@@ -50,34 +58,56 @@ class AmbienteLabirinto(Ambiente):
         [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
         [1, 0, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 0, 1],
         [1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-        [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0]  #(Objetivo em 14,14)
+        [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2]
     ]
 
-    def __init__(self, mapa_data: List[List[int]] = None):
-        self.size = 15  # Tamanho padrão
-        self.agente_pos = (0, 0)  # Posição inicial FIXA
+    # 3. MAPA DIFÍCIL (20x20)
+    MAPA_DIFICIL = [
+        [0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+        [0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1],
+        [1, 1, 1, 1, 0, 1, 0, 1, 1, 1, 1, 0, 1, 0, 1, 1, 1, 1, 0, 1],
+        [1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 1],
+        [1, 0, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 0, 1, 0, 1],
+        [1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0, 1],
+        [1, 0, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 1, 0, 1, 0, 1],
+        [1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 1],
+        [1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 0, 1],
+        [1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 1],
+        [1, 0, 1, 1, 1, 1, 1, 0, 1, 0, 1, 0, 1, 0, 1, 1, 1, 1, 1, 1],
+        [1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1],
+        [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 1, 0, 1, 1, 0, 1],
+        [1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0, 0, 1],
+        [1, 0, 1, 0, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 1, 0, 1, 1],
+        [1, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1],
+        [1, 0, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 1],
+        [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+        [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 1],
+        [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 2]
+    ]
+
+    def __init__(self, dificuldade="medio"):
+        # Seleciona o mapa com base na dificuldade
+        if dificuldade == "facil":
+            self.mapa_atual = self.MAPA_FACIL
+        elif dificuldade == "dificil":
+            self.mapa_atual = self.MAPA_DIFICIL
+        else:
+            self.mapa_atual = self.MAPA_MEDIO  # Padrão
+
+        # O tamanho é definido automaticamente pelo mapa escolhido
+        self.size = len(self.mapa_atual)
+
+        self.agente_pos = (0, 0)
         self.objetivo = None
         self.paredes = []
 
-        if mapa_data is None:
-            mapa_data = self.MAPA_PADRAO_15X15_EXEMPLO
-
-        # Gerar Paredes e encontrar o Objetivo a partir dos dados do mapa
-        self._gerar_paredes_do_mapa(mapa_data)
+        # Gerar Paredes e Objetivo
+        self._gerar_paredes_do_mapa(self.mapa_atual)
 
     def _gerar_paredes_do_mapa(self, mapa_data: List[List[int]]):
-        """
-        Gera a lista self.paredes e define o objetivo (2).
-        A Posição de Início é FIXA em (0, 0).
-        Convenção: 0: Vazio, 1: Parede, 2: Objetivo, -1: Ignorado.
-        """
-        if len(mapa_data) != self.size or len(mapa_data[0]) != self.size:
-            raise ValueError(f"O mapa deve ser {self.size}x{self.size}.")
-
         self.paredes = []
         posicao_objetivo = None
 
-        # 1. Percorrer o mapa para identificar Paredes e Objetivo
         for y in range(self.size):
             for x in range(self.size):
                 valor = mapa_data[y][x]
@@ -85,38 +115,24 @@ class AmbienteLabirinto(Ambiente):
                 if valor == 1:
                     self.paredes.append(Parede(x, y))
                 elif valor == 2:
-                    if posicao_objetivo:
-                        print("Aviso: Múltiplos Objetivos (2) encontrados.")
                     posicao_objetivo = (x, y)
 
-        # 2. Definir Posição e Objetivo
-
-        # Posição inicial FIXA em (0, 0)
         self.agente_pos = (0, 0)
 
-        # Define a posição do Objetivo
         if posicao_objetivo is not None:
             self.objetivo = Objetivo(posicao_objetivo[0], posicao_objetivo[1])
         else:
+            # Se não houver '2' no mapa, assume o canto inferior direito
             self.objetivo = Objetivo(self.size - 1, self.size - 1)
-            print(
-                f"Aviso: Objetivo (2) não encontrado. Assumindo a posição padrão ({self.objetivo.x}, {self.objetivo.y}).")
 
-        # 3. VERIFICAÇÃO CRÍTICA: Garantir que (0, 0) não é uma parede
-
-        # Se (0, 0) foi definido como parede, removemos essa parede para garantir o início
+        # Garante que o inicio não é parede
         if self.get_coisa_em(0, 0).name == "Parede":
             self.paredes = [p for p in self.paredes if (p.x, p.y) != (0, 0)]
-            print("Aviso: (0, 0) era uma parede e foi removida para garantir o início.")
-
-    # --- Métodos de Interação com o Ambiente ---
 
     def reset(self):
-        """ Reseta a posição do agente para a posição inicial FIXA em (0, 0). """
         self.agente_pos = (0, 0)
 
     def get_coisa_em(self, x, y):
-        """ Retorna o objeto (Objetivo, Parede, Vazio) numa dada coordenada. """
         if (self.objetivo.x, self.objetivo.y) == (x, y):
             return self.objetivo
         for p in self.paredes:
@@ -125,42 +141,30 @@ class AmbienteLabirinto(Ambiente):
         return Vazio(x, y)
 
     def observacaoPara(self):
-        """ A observação é a posição atual do agente (estado 's'). """
         return self.agente_pos
 
     def agir(self, accao: Tuple[int, int]) -> float:
-        """
-        Move o agente de acordo com a ação (dx, dy) e devolve a recompensa.
-        Recompensas: +100 (Objetivo), -5 (Parede), -10 (Limite), -1 (Passo).
-        """
         curr_x, curr_y = self.agente_pos
         dx, dy = accao
         new_x, new_y = curr_x + dx, curr_y + dy
 
-        # 1. Verificar Limites
         if not (0 <= new_x < self.size and 0 <= new_y < self.size):
-            return -10  # Penalidade por sair do mapa
+            return -10  # Penalidade Limite
 
         coisa = self.get_coisa_em(new_x, new_y)
 
-        # 2. Verificar Parede
         if isinstance(coisa, Parede):
-            return -5  # Penalidade por bater na parede (não move o agente)
+            return -5  # Penalidade Parede
 
-        # 3. Mover o Agente
         self.agente_pos = (new_x, new_y)
 
-        # 4. Verificar Objetivo
         if isinstance(coisa, Objetivo):
-            return 100  # Recompensa por atingir o objetivo
+            return 100  # Objetivo
 
-        # 5. Passo Normal
-        return -1  # Custo por cada passo
+        return -1  # Custo Passo
 
     def jogo_terminou(self) -> bool:
-        """ Verifica se o agente está na posição do objetivo. """
         return self.agente_pos == (self.objetivo.x, self.objetivo.y)
 
     def render(self):
-        """ Método exigido pela interface (implementação visual no Pygame_Simulador). """
         pass
