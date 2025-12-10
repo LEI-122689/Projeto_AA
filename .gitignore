@@ -1,0 +1,6 @@
+# Python cache files
+__pycache__/
+# Python compiled files
+*.pyc
+# IDE files (e.g., PyCharm, IntelliJ IDEA)
+.idea/# created by virtualenv automatically
