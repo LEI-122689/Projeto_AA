@@ -40,7 +40,7 @@ class AmbienteFarol(Ambiente):
         elif tipo == "dificil":
             mapa = self._carrega_mapa("medio")
             # Correntes Fortes (2): Alto Risco (Recompensa -10)
-            for y in range(1, 10): mapa[y][9] = 2  # Coluna central de correntes perigosa
+            for y in range(0, 4): mapa[y][6] = 2  # Coluna central de correntes perigosa
             mapa[5][1] = 2
             mapa[5][19] = 2
             return mapa
@@ -84,10 +84,10 @@ class AmbienteFarol(Ambiente):
         elif terreno == 2:  # Correntes Fortes
             return -10
 
-        elif terreno == 1:  # Pedras/Recifes
+        elif terreno == 1:  # Pedras
             return -5
 
-        else:  # 0: Água Rasa (Passo Padrão)
+        else:  # 0:  Passo Padrão
             return -1
 
     def jogo_terminou(self) -> bool:

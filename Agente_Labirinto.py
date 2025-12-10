@@ -16,7 +16,6 @@ class AgenteLabirinto(Agente):
         self.recompensa_acumulada = 0
         self.q_table = {}
         self.learning_mode = True
-
         self.estado_anterior = None
         self.acao_anterior = None
         self.estado_atual = None
