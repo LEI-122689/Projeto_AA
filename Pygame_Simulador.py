@@ -7,7 +7,7 @@ import math  # Para Farol: calcular a luz
 TamanhoBloco = 30
 Preto = (0, 0, 0)
 Branco = (255, 255, 255)
-Verde = (0, 150, 0)  # Farol (Luz)
+Verde = (255, 255, 0)  # Farol (Luz)
 Vermelho = (200, 0, 0)  # Parede / Farol (Centro)
 Azul = (0, 0, 255)  # Agente
 Amarelo = (255, 255, 0)  # Saída / Objetivo

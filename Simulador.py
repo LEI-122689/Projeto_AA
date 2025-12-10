@@ -6,7 +6,6 @@ from Agente_Labirinto import AgenteLabirinto
 from Ambiente_Farol import AmbienteFarol
 from Agente_Farol import AgenteFarol
 
-# Importar o visualizador Pygame
 try:
     from Pygame_Simulador import VisualizadorPygame
 except ImportError:
@@ -149,5 +148,5 @@ if __name__ == "__main__":
     sim = Simulador()
     #sim.cria("farol", dificuldade="dificil")
     sim.cria("labirinto")
-    sim.fps = 10
+    sim.fps = 5
     sim.executa()
