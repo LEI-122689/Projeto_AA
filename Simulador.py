@@ -169,31 +169,60 @@ class Simulador:
 
         return sucesso, self.passos, self.agente.recompensa_acumulada
 
-    def executa(self, num_episodios=1000):
+    def executa(self, episodios_treino=1000, episodios_teste=100):
         if self.ambiente is None or self.agente is None:
             print("Erro: Tens de correr sim.cria() primeiro!")
             return
 
-        # Ajuste do número de episódios
-        if self.modo == "farol":
-            num_episodios = 1500
-        else:
-            num_episodios = 1000
+        # --- FASE 1: APRENDIZAGEM ---
+        print(f"\n>>> INÍCIO DO TREINO ({episodios_treino} episódios)")
+        print(f"    Modo: Learning=TRUE | Epsilon=Dinâmico")
 
+        # Garantir que o agente está configurado para aprender
         self.agente.learning_mode = True
+        # (O epsilon já está alto por defeito no init do agente)
 
-        print(f"--- Início da Simulação: {self.modo.upper()} ({num_episodios} Episódios de Aprendizagem) ---")
+        for episodio in range(1, episodios_treino + 1):
+            # Renderizar apenas o último episódio do treino para confirmares que ele aprendeu
+            render = (episodio == episodios_treino)
 
-        for episodio in range(1, num_episodios + 1):
-            render_agora = (episodio == num_episodios)
+            sucesso, passos, recompensa = self.executa_episodio(renderizar=render)
 
-            sucesso, passos, recompensa_total = self.executa_episodio(renderizar=render_agora)
+            # Logs periódicos para saberes que não encravou
+            if episodio % 100 == 0:
+                print(f"   [Treino] Ep {episodio}/{episodios_treino} | Passos: {passos} | Rec: {recompensa:.1f}")
 
-            if episodio % (num_episodios // 10) == 0 or episodio == num_episodios or episodio == 1:
-                print(
-                    f"Episódio {episodio}/{num_episodios} | Sucesso: {sucesso} | Passos: {passos} | Recompensa Total: {recompensa_total:.2f} | Epsilon: {self.agente.epsilon:.4f}")
+        # --- O SWITCH (MUDANÇA DE MODO) ---
+        print("\n>>> FIM DO TREINO. A MUDAR PARA MODO DE TESTE...")
+        self.agente.learning_mode = False  # Para de atualizar a Q-Table/Memória [cite: 85]
+        self.agente.epsilon = 0.0  # Para de explorar (Greedy puro)
 
-        print("--- FIM: Simulação Concluída. ---")
+        # --- FASE 2: TESTE / AVALIAÇÃO ---
+        print(f">>> INÍCIO DO TESTE ({episodios_teste} episódios)")
+        print(f"    Modo: Learning=FALSE | Epsilon=0.0")
+
+        sucessos_teste = 0
+        total_passos_teste = 0
+
+        for episodio in range(1, episodios_teste + 1):
+            # No teste, podes querer ver mais vezes, ou apenas o último
+            render = (episodio == episodios_teste)
+
+            sucesso, passos, recompensa = self.executa_episodio(renderizar=render)
+
+            if sucesso:
+                sucessos_teste += 1
+            total_passos_teste += passos
+
+        # --- RESULTADOS FINAIS ---
+        taxa = (sucessos_teste / episodios_teste) * 100
+        media_passos = total_passos_teste / episodios_teste
+
+        print("\n" + "=" * 40)
+        print(f"RESULTADOS FINAIS ({self.modo.upper()}):")
+        print(f"Taxa de Sucesso: {taxa:.1f}%")
+        print(f"Média de Passos: {media_passos:.1f}")
+        print("=" * 40)
 
 
 # Exemplo de uso:
@@ -202,4 +231,4 @@ if __name__ == "__main__":
     #sim.cria("farol", "dificil", "novelty")
     sim.cria("labirinto", "dificil", "qlearning")
     sim.fps = 10
-    sim.executa()
+    sim.executa(episodios_treino=1000, episodios_teste=100)
