@@ -1,66 +1,92 @@
-import numpy as np
 import random
+from Interface_Agente import Agente
 
 
-class AgenteNovelty:
+class AgenteNovelty(Agente):
     def __init__(self):
+        self.visitas = {}
+        self.paredes_conhecidas = set()
+
+        self.estado_atual = None
+        self.posicao_anterior = None
+        self.acao_anterior = None
+
+        self.acoes = [(0, -1), (0, 1), (-1, 0), (1, 0)]
+
+        # --- NOVIDADE: Memória de Curto Prazo (Taboo List) ---
+        # Guarda as últimas 4 posições para evitar loops imediatos
+        self.historico_recente = []
+
+        # Flag técnica para o bug do simulador
+        self.ja_agiu = False
+
+        # Compatibilidade
         self.recompensa_acumulada = 0
-
-        self.input_size = 4
-        self.output_size = 4
-
-        # Pesos: Como ligo os sensores às ações
-        self.pesos = np.random.uniform(-1, 1, (self.input_size, self.output_size))
-
-        # BIAS: A "personalidade" base do agente (ajuda a não bloquear em zeros)
-        self.bias = np.random.uniform(-1, 1, (self.output_size,))
-
-        self.posicao_final = (0, 0)
-        self.score_novidade = 0.0
+        self.epsilon = 0.0
         self.learning_mode = False
-        self.epsilon = 0
-
-    def mutate(self, taxa=0.1):
-        # Mutação nos Pesos
-        ruido_w = np.random.normal(0, 0.5, size=self.pesos.shape)
-        mask_w = np.random.random(self.pesos.shape) < taxa
-        self.pesos[mask_w] += ruido_w[mask_w]
-
-        # Mutação no Bias (Importante!)
-        ruido_b = np.random.normal(0, 0.5, size=self.bias.shape)
-        mask_b = np.random.random(self.bias.shape) < taxa
-        self.bias[mask_b] += ruido_b[mask_b]
-
-        # Limitar valores para não explodir
-        self.pesos = np.clip(self.pesos, -2, 2)
-        self.bias = np.clip(self.bias, -2, 2)
 
     def observacao(self, obs):
-        # MUDANÇA: Vazio agora é 0.5 para estimular a rede a ativar-se
-        # Parede continua negativo para inibir
-        mapeamento = {"Parede": -1.0, "Vazio": 0.5, "Saida": 2.0}
+        self.estado_atual = obs
 
-        sensores = [
-            mapeamento.get(obs.get("N"), -1),
-            mapeamento.get(obs.get("S"), -1),
-            mapeamento.get(obs.get("W"), -1),
-            mapeamento.get(obs.get("E"), -1)
-        ]
-        self.input_vector = np.array(sensores)
+        # 1. Deteção de Paredes
+        if self.ja_agiu:
+            if self.posicao_anterior == self.estado_atual and self.acao_anterior is not None:
+                dx, dy = self.acao_anterior
+                cx, cy = self.estado_atual
+                self.paredes_conhecidas.add((cx + dx, cy + dy))
+            self.ja_agiu = False
+
+        # 2. Registar Visita Global
+        if self.estado_atual not in self.visitas:
+            self.visitas[self.estado_atual] = 0
+        self.visitas[self.estado_atual] += 1
+
+        # 3. Atualizar Histórico Recente
+        self.historico_recente.append(self.estado_atual)
+        if len(self.historico_recente) > 4:  # Lembra-se dos últimos 4 passos
+            self.historico_recente.pop(0)
+
+        self.posicao_anterior = self.estado_atual
 
     def age(self):
-        # Matemática: y = Wx + b (Pesos * Input + Bias)
-        sinais = np.dot(self.input_vector, self.pesos) + self.bias
+        cx, cy = self.estado_atual
+        candidatos = []
 
-        # Função de Ativação (Tanh) para dar não-linearidade (Opcional mas bom)
-        decisao = np.tanh(sinais)
+        # Baralhar ações para evitar tendências de movimento (vício de ir sempre Norte)
+        random.shuffle(self.acoes)
 
-        acao_idx = np.argmax(decisao)
-        acoes = [(0, -1), (0, 1), (-1, 0), (1, 0)]
-        return acoes[acao_idx]
+        for acao in self.acoes:
+            dx, dy = acao
+            vizinho = (cx + dx, cy + dy)
 
-    def atualiza_posicao(self, pos):
-        self.posicao_final = pos
+            # Se é parede, ignora
+            if vizinho in self.paredes_conhecidas:
+                continue
+
+            # --- CÁLCULO DO SCORE (Visitas + Penalidade Recente) ---
+            score = self.visitas.get(vizinho, 0)
+
+            # Se estive lá recentemente, adiciono uma penalidade temporária GIGANTE
+            if vizinho in self.historico_recente:
+                score += 1000
+
+            candidatos.append((score, acao))
+
+        # Se estiver encurralado (tudo parece mau), tenta qualquer coisa
+        if not candidatos:
+            acao = random.choice(self.acoes)
+        else:
+            # Escolhe o vizinho com MENOR score (Menos visitas E não visitado recentemente)
+            min_score = min(candidatos, key=lambda x: x[0])[0]
+            melhores_opcoes = [acao for (s, acao) in candidatos if s == min_score]
+            acao = random.choice(melhores_opcoes)
+
+        self.acao_anterior = acao
+        self.ja_agiu = True
+        return acao
 
     def avaliacaoEstadoAtual(self, recompensa):
         self.recompensa_acumulada += recompensa
+
+    def atualiza_posicao(self, nova_pos):
+        self.observacao(nova_pos)
