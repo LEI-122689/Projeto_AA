@@ -11,12 +11,12 @@ Verde = (255, 255, 0)  # Farol (Luz)
 Vermelho = (200, 0, 0)  # Parede / Farol (Centro)
 Azul = (0, 0, 255)  # Agente
 Amarelo = (255, 255, 0)  # Saída / Objetivo
-Cinzento_Escuro = (60, 60, 60)  # Pedras/Recifes (Risco Médio = 1)
-Azul_Escuro = (0, 0, 100)  # Correntes Fortes (Risco Alto = 2)
+Cinzento_Escuro = (60, 60, 60)  # Pedras/Recifes
+Azul_Escuro = (0, 0, 100)  # Correntes Fortes
+Magenta = (255, 0, 255)  # Cor do Laser do Sensor
 
 
 class VisualizadorPygame:
-    # ALTERAÇÃO: Adicionados argumentos 'dificuldade' e 'nome_agente'
     def __init__(self, ambiente, problema, max_passos, fps, dificuldade, nome_agente):
         pygame.init()
         self.ambiente = ambiente
@@ -36,7 +36,6 @@ class VisualizadorPygame:
 
         self.ecran = pygame.display.set_mode((self.largura, self.altura))
 
-        # ALTERAÇÃO: Título na ordem pedida (FPS -> Problema -> Dificuldade -> Agente)
         titulo = f"FPS: {fps} | Problema: {problema.upper()} | Dificuldade: {dificuldade.upper()} | Agente: {nome_agente.upper()}"
         pygame.display.set_caption(titulo)
 
@@ -74,7 +73,7 @@ class VisualizadorPygame:
         ax, ay = self.ambiente.agente_pos
         mapa = self.ambiente.mapa_obstaculos
 
-        # Lógica da Luz (Mantida do teu código original)
+        # Lógica da Luz
         direcoes = [
             (0, -1), (1, -1), (1, 0), (1, 1),
             (0, 1), (-1, 1), (-1, 0), (-1, -1)
@@ -91,7 +90,6 @@ class VisualizadorPygame:
             for x in range(self.size_x):
                 rect = pygame.Rect(x * TamanhoBloco, y * TamanhoBloco, TamanhoBloco, TamanhoBloco)
 
-                # Definir cor base pelo terreno
                 terreno = mapa[y][x]
                 if terreno == 3:  # Farol
                     cor_bloco = Vermelho
@@ -113,11 +111,9 @@ class VisualizadorPygame:
                 if (x, y) == (ax, ay):
                     pygame.draw.circle(self.ecran, Azul, rect.center, TamanhoBloco // 3)
 
-        # Incrementa o tempo do Farol para animação
         self.ambiente.tempo_luz += 1
 
     def _desenha_painel(self, epsilon):
-        # Painel de métricas no fundo
         painel_rect = pygame.Rect(0, self.size_y * TamanhoBloco, self.largura, 50)
         pygame.draw.rect(self.ecran, (200, 200, 200), painel_rect)
 
@@ -128,13 +124,13 @@ class VisualizadorPygame:
             status_cor = Preto
             status_msg = ""
 
-        # Formatação do texto do rodapé
-        status_text = f"Passo: {self.passos_atuais} / {self.max_passos} | Recompensa: {self.recompensa:.2f} | Epsilon: {epsilon:.4f} {status_msg}"
+        status_text = f"Passo: {self.passos_atuais}/{self.max_passos} | Rec: {self.recompensa:.2f} | Eps: {epsilon:.2f} {status_msg}"
 
         texto_render = self.font.render(status_text, True, status_cor)
         self.ecran.blit(texto_render, (10, self.size_y * TamanhoBloco + 15))
 
-    def desenha(self, passos, recompensa, terminou, sucesso, epsilon):
+    # --- AQUI ESTAVA O PROBLEMA: Garante que este método existe e está alinhado ---
+    def desenha(self, passos, recompensa, terminou, sucesso, epsilon, sensor_alvo=None):
         """ Chamado pelo Simulador para atualizar o estado e desenhar. """
 
         self.passos_atuais = passos
@@ -154,13 +150,24 @@ class VisualizadorPygame:
         elif self.problema == 'farol':
             self._desenha_farol()
 
+        # --- VISUALIZAÇÃO DO SENSOR (LASER) ---
+        if sensor_alvo is not None:
+            ax, ay = self.ambiente.agente_pos
+            tx, ty = sensor_alvo
+
+            # Centro dos blocos
+            start_pos = (ax * TamanhoBloco + TamanhoBloco // 2, ay * TamanhoBloco + TamanhoBloco // 2)
+            end_pos = (tx * TamanhoBloco + TamanhoBloco // 2, ty * TamanhoBloco + TamanhoBloco // 2)
+
+            # Linha Magenta
+            pygame.draw.line(self.ecran, Magenta, start_pos, end_pos, 3)
+            pygame.draw.circle(self.ecran, Magenta, end_pos, 5)
+
         # 3. Desenhar o Painel
         self._desenha_painel(epsilon)
 
         # 4. Atualizar o Ecrã
         pygame.display.flip()
-
-        # 5. Limitar FPS
         self.clock.tick(self.FPS_limite)
 
     def fechar(self):

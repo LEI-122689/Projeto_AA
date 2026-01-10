@@ -5,6 +5,7 @@ from Agente_Labirinto import AgenteLabirinto
 from Ambiente_Farol import AmbienteFarol
 from Agente_Farol import AgenteFarol
 from Agente_Novelty import AgenteNovelty
+from Sensor import Sensor
 
 try:
     from Pygame_Simulador import VisualizadorPygame
@@ -25,64 +26,49 @@ class Simulador:
 
     def cria(self, tipo_problema, dificuldade="facil", algoritmo="qlearning"):
         self.modo = tipo_problema
+        self.dificuldade_atual = dificuldade # Importante para a GUI
 
-        # --- CORREÇÃO IMPORTANTE: Guardar a dificuldade ---
-        # Isto é essencial para o Pygame conseguir escrever "Dificuldade: DIFICIL" no título
-        self.dificuldade_atual = dificuldade
-
-        # 1. Escolher e Carregar o Ambiente
+        # 1. Carregar Ambiente
         if tipo_problema == "farol":
-            print(f"-> A carregar Problema: Farol ({dificuldade.upper()}) | Algoritmo: {algoritmo.upper()}")
-            # Passamos a dificuldade para o ambiente carregar as pedras/correntes certas
+            print(f"-> Farol ({dificuldade}) | Agente: {algoritmo}")
             self.ambiente = AmbienteFarol(mapa_tipo=dificuldade)
-            # Guardar observação inicial (necessário para inicializar o agente)
-            obs_inicial = self.ambiente.observacaoPara()
+            obs_inicial = self.ambiente.observacaoPara() # Obs original (será filtrada depois)
 
         elif tipo_problema == "labirinto":
-            print(f"-> A carregar Problema: Labirinto ({dificuldade.upper()}) | Algoritmo: {algoritmo.upper()}")
+            print(f"-> Labirinto ({dificuldade}) | Agente: {algoritmo}")
             self.ambiente = AmbienteLabirinto(dificuldade)
             obs_inicial = self.ambiente.agente_pos
 
         else:
-            raise Exception("Problema desconhecido! Escolhe 'farol' ou 'labirinto'.")
+            raise Exception("Problema desconhecido.")
 
-        # 2. Escolher e Configurar o Agente
+        # --- NOVO: Inicializar o Sensor ---
+        self.sensor = Sensor(self.ambiente, dificuldade)
+        # ----------------------------------
+
+        # 2. Configurar Agente
         if algoritmo == "novelty":
-            # --- Configuração Agente NOVELTY ---
             self.agente = AgenteNovelty()
-
-            # O Novelty precisa de MUITO mais passos porque anda a explorar às cegas
             self.max_passos = 2000
-
-            # Inicialização da memória do agente
             if tipo_problema == "farol":
-                # Nota: No executa_episodio forçamos as coordenadas absolutas,
-                # mas aqui inicializamos com o standard do ambiente para não dar erro.
                 self.agente.observacao(obs_inicial)
             elif tipo_problema == "labirinto":
                 self.agente.atualiza_posicao(obs_inicial)
 
         elif algoritmo == "qlearning":
-            # --- Configuração Agente Q-LEARNING (Teus Agentes Originais) ---
             if tipo_problema == "farol":
                 self.agente = AgenteFarol()
                 self.agente.observacao(obs_inicial)
-                self.max_passos = 500  # O Farol resolve-se depressa se ele souber o caminho
-
+                self.max_passos = 500
             elif tipo_problema == "labirinto":
                 self.agente = AgenteLabirinto()
                 self.agente.atualiza_posicao(obs_inicial)
-
-                # Ajuste fino: Labirinto Difícil precisa de mais tempo que o Fácil
-                if dificuldade == "dificil":
-                    self.max_passos = 500
-                else:
-                    self.max_passos = 200
+                # Ajuste para labirinto dificil
+                if dificuldade == "dificil": self.max_passos = 500
+                else: self.max_passos = 200
         else:
-            raise Exception(f"Algoritmo '{algoritmo}' não reconhecido. Usa 'qlearning' ou 'novelty'.")
+             raise Exception(f"Algoritmo '{algoritmo}' não reconhecido.")
 
-        # 3. Limpeza do Visualizador Antigo
-        # Se mudarmos de problema a meio, temos de matar a janela antiga para criar uma nova com o tamanho certo
         if self.visualizador:
             self.visualizador.fechar()
         self.visualizador = None
@@ -95,23 +81,23 @@ class Simulador:
         self.ambiente.reset()
         self.agente.recompensa_acumulada = 0
 
-        # --- CORREÇÃO NOVELTY (Farol e Labirinto) ---
-        # O Novelty precisa SEMPRE de coordenadas (x,y)
+        # --- PREPARAÇÃO DO NOVELTY ---
+        # O Novelty precisa de limpar a memória de curto prazo a cada episódio
         if isinstance(self.agente, AgenteNovelty):
             self.agente.observacao(self.ambiente.agente_pos)
             self.agente.historico_recente = []
             self.agente.ja_agiu = False
         else:
-            # Q-Learning (Comportamento Original)
+            # Preparação Q-Learning (Reset posições iniciais)
             if self.modo == "labirinto":
                 self.agente.atualiza_posicao(self.ambiente.agente_pos)
             elif self.modo == "farol":
+                # Nota: A observação inicial do Farol será atualizada logo no loop
+                # mas convém inicializar para evitar erros
                 self.agente.observacao(self.ambiente.observacaoPara())
 
-        # Inicializar Pygame
+        # --- INICIALIZAR PYGAME ---
         if renderizar and VisualizadorPygame:
-            # Ir buscar a dificuldade guardada no self.cria()
-            # Se der erro aqui, certifica-te que adicionaste 'self.dificuldade_atual = dificuldade' no método cria()
             dif = getattr(self, "dificuldade_atual", "N/A")
             nome_agente = "Novelty" if isinstance(self.agente, AgenteNovelty) else "Q-Learning"
 
@@ -120,36 +106,63 @@ class Simulador:
                 self.modo,
                 self.max_passos,
                 self.fps,
-                dif,  # Argumento novo 1
-                nome_agente  # Argumento novo 2
+                dif,
+                nome_agente
             )
 
+        # --- LOOP DO EPISÓDIO ---
         while not terminou and self.passos < self.max_passos:
 
+            # 1. CONSULTAR O SENSOR (Onde está o objetivo?)
+            pos_objetivo = self.sensor.get_posicao_objetivo()
+
+            # 2. ATUALIZAR VISUALIZADOR (Desenha o "Laser" se o sensor vir o objetivo)
             if self.visualizador:
                 sucesso = self.ambiente.jogo_terminou()
-                self.visualizador.desenha(self.passos, self.agente.recompensa_acumulada, terminou, sucesso,
-                                          self.agente.epsilon)
+                self.visualizador.desenha(
+                    self.passos,
+                    self.agente.recompensa_acumulada,
+                    terminou,
+                    sucesso,
+                    self.agente.epsilon,
+                    sensor_alvo=pos_objetivo  # <--- Passamos o alvo para desenhar a linha
+                )
 
-            # 1. Percepção
-            obs_raw = self.ambiente.observacaoPara()
-
-            # --- FORÇAR COORDENADAS PARA NOVELTY ---
+            # 3. PERCEPÇÃO (O que o Agente "Vê")
             if isinstance(self.agente, AgenteNovelty):
-                self.agente.observacao(self.ambiente.agente_pos)
-            else:
-                self.agente.observacao(obs_raw)
+                # --- ALTERAÇÃO AQUI ---
+                # Passamos a posição do agente E a posição do objetivo (se visível)
+                self.agente.observacao(self.ambiente.agente_pos, alvo=pos_objetivo)
 
-            # 2. Ação
+            elif isinstance(self.agente, AgenteFarol):
+                # O Agente Farol precisa de saber a Direção (Vetor)
+                if pos_objetivo is not None:
+                    # Sensor vê o farol -> Calculamos o vetor (dx, dy)
+                    ax, ay = self.ambiente.agente_pos
+                    fx, fy = pos_objetivo
+                    obs = (fx - ax, fy - ay)
+                else:
+                    # Sensor não vê nada -> Agente fica cego (None)
+                    obs = None
+
+                self.agente.observacao(obs)
+
+            elif isinstance(self.agente, AgenteLabirinto):
+                # O Labirinto Q-Learning usa apenas a posição interna (já atualizada abaixo)
+                self.agente.observacao(None)
+
+            # 4. AÇÃO
             acao = self.agente.age()
 
-            # 3. Execução
+            # 5. EXECUÇÃO NO AMBIENTE
             recompensa = self.ambiente.agir(acao)
 
-            # 4. Atualização
+            # 6. ATUALIZAÇÃO DO AGENTE
+            # Se for labirinto (Q-Learning), temos de dizer onde ele "aterrou"
             if self.modo == "labirinto" and not isinstance(self.agente, AgenteNovelty):
                 self.agente.atualiza_posicao(self.ambiente.agente_pos)
 
+            # Aprender (Update Q-Table ou Novelty Score)
             self.agente.avaliacaoEstadoAtual(recompensa)
 
             if self.ambiente.jogo_terminou():
@@ -157,12 +170,20 @@ class Simulador:
 
             self.passos += 1
 
+        # --- FIM DO LOOP ---
+
         sucesso = self.ambiente.jogo_terminou()
 
-        # Desenho final e pausa curta
+        # Desenho Final (Pausa para veres o resultado)
         if self.visualizador:
-            self.visualizador.desenha(self.passos, self.agente.recompensa_acumulada, terminou, sucesso,
-                                      self.agente.epsilon)
+            self.visualizador.desenha(
+                self.passos,
+                self.agente.recompensa_acumulada,
+                terminou,
+                sucesso,
+                self.agente.epsilon,
+                sensor_alvo=None  # Removemos a linha no fim
+            )
             time.sleep(0.5)
             self.visualizador.fechar()
             self.visualizador = None
@@ -229,6 +250,6 @@ class Simulador:
 if __name__ == "__main__":
     sim = Simulador()
     #sim.cria("farol", "dificil", "novelty")
-    sim.cria("labirinto", "dificil", "qlearning")
+    sim.cria("farol", "dificil", "qlearning")
     sim.fps = 10
     sim.executa(episodios_treino=1000, episodios_teste=100)
