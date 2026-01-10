@@ -36,10 +36,13 @@ class AgenteFarol(Agente):
         pass  # Não usado no Farol
 
     def _converte_vetor_para_estado(self, vetor: Tuple[int, int]) -> str:
-        """ Converte o vetor de distância (observação) num estado discreto (direção). """
-        dx, dy = vetor
+        # --- NOVO: Se o vetor for None, estamos cegos ---
+        if vetor is None:
+            return "SEM_SINAL"
+            # ------------------------------------------------
 
-        # Normaliza o vetor para apenas a direção (+1, -1, 0)
+        dx, dy = vetor
+        # ... (resto da lógica de normalização mantém-se igual) ...
         norm_x = 0
         if dx > 0:
             norm_x = 1
@@ -52,9 +55,7 @@ class AgenteFarol(Agente):
         elif dy < 0:
             norm_y = -1
 
-        if (norm_x, norm_y) == (0, 0):
-            return "FAROL"
-
+        if (norm_x, norm_y) == (0, 0): return "FAROL"
         return DIRECOES_MAP.get((norm_x, norm_y), "UNKNOWN")
 
     def _get_q_valores(self, estado: str) -> dict:
@@ -71,7 +72,7 @@ class AgenteFarol(Agente):
         return random.choice(melhores_acoes)  # Desempate aleatório
 
     def observacao(self, obs: Any):
-        """ Recebe a observação (vetor de diferença) e converte-a no estado 's'. """
+        # Agora o 'obs' pode ser None se o sensor estiver fora de alcance
         self.estado_atual = self._converte_vetor_para_estado(obs)
 
     def age(self) -> Tuple[int, int]:
