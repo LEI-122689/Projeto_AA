@@ -7,7 +7,7 @@ Guilherme Silva | Nº: 123303
 Luís Silva | Nº: 122689
 
 ## Dependências
-O projeto requer Python 3 e a biblioteca pygame para a visualização gráfica.
+O projeto requer Python 3.13 e a biblioteca pygame para a visualização gráfica.
 
     pip install pygame
 
