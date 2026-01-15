@@ -2,15 +2,16 @@ import random
 from Interface_Agente import Agente
 from typing import Tuple, Any
 
-# --- Parâmetros (Ajustados para aprender sem "batota") ---
-ALPHA = 0.3  # Aprende rápido com os erros (bater nas paredes)
-GAMMA = 0.95  # Valoriza muito o futuro (encontrar a saída)
+# --- Parâmetros de Q-Learning ---
+ALPHA = 0.3
+GAMMA = 0.95
 EPSILON_START = 1.0
-EPSILON_DECAY = 0.9995
+EPSILON_DECAY = 0.999
 MIN_EPSILON = 0.01
 
 ACOES = [(0, -1), (0, 1), (-1, 0), (1, 0)]  # N, S, O, E
 
+# Mapeamento do vetor (dx, dy) normalizado para o estado discreto (direção)
 DIRECOES_MAP = {
     (0, -1): "N", (1, -1): "NE", (1, 0): "E", (1, 1): "SE",
     (0, 1): "S", (-1, 1): "SW", (-1, 0): "W", (-1, -1): "NW"
@@ -35,10 +36,13 @@ class AgenteFarol(Agente):
         pass
 
     def _converte_vetor_para_estado(self, obs_completa) -> str:
-        # Recebe ((dx, dy), (n, s, w, e))
+        """
+        Recebe ((dx, dy), (n, s, w, e)) e cria um estado único.
+        """
+        # Desempacotar: Vetor do sensor + Máscara de obstáculos
         vetor, obstaculos = obs_completa
 
-        # 1. Direção do Objetivo
+        # 1. Processar a Direção
         estado_dir = "SEM_SINAL"
         if vetor is not None:
             dx, dy = vetor
@@ -59,15 +63,14 @@ class AgenteFarol(Agente):
             else:
                 estado_dir = DIRECOES_MAP.get((norm_x, norm_y), "UNKNOWN")
 
-        # 2. Obstáculos (0 ou 1 nas 4 direções)
+        # 2. Processar os Obstáculos (Transforma tupla em string "0100")
         str_obstaculos = "".join(str(b) for b in obstaculos)
 
-        # Estado Exemplo: "N_0100" (Objetivo a Norte, Parede a Sul)
+        # 3. Estado Final Combinado (Ex: "N_0100")
         return f"{estado_dir}_{str_obstaculos}"
 
     def _get_q_valores(self, estado: str) -> dict:
         if estado not in self.q_table:
-            # Inicializamos a zeros. O agente terá de descobrir sozinho.
             self.q_table[estado] = {acao: 0.0 for acao in ACOES}
         return self.q_table[estado]
 
@@ -78,13 +81,12 @@ class AgenteFarol(Agente):
         return random.choice(melhores_acoes)
 
     def observacao(self, obs: Any):
+        # 'obs' agora é uma tupla ((dx,dy), (obstaculos))
         self.estado_atual = self._converte_vetor_para_estado(obs)
 
     def age(self) -> Tuple[int, int]:
         self.estado_anterior = self.estado_atual
 
-        # LÓGICA PURA: Epsilon-Greedy
-        # Sem "If sensor override". O agente decide com base no que aprendeu.
         if self.learning_mode and random.random() < self.epsilon:
             acao = random.choice(ACOES)
         else:
@@ -104,7 +106,7 @@ class AgenteFarol(Agente):
 
             q_s = self._get_q_valores(s)
 
-            if s_prime.startswith("FAROL"):
+            if s_prime.startswith("FAROL"):  # Ajuste para detetar prefixo do estado final
                 max_q_prime = 0.0
             else:
                 q_s_prime = self._get_q_valores(s_prime)

@@ -201,6 +201,6 @@ class Simulador:
 
 if __name__ == "__main__":
     sim = Simulador()
-    sim.cria("labirinto", "medio", "qlearning")
+    sim.cria("labirinto", "dificil", "novelty")
     sim.fps = 10
     sim.executa(episodios_treino=1000, episodios_teste=100)
