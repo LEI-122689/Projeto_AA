@@ -38,3 +38,17 @@ A função sim.cria aceita os seguintes parâmetros:
         # Ajuste de FPS e episódios
         sim.fps = 10
         sim.executa(episodios_treino=1000, episodios_teste=100)
+
+## Análise de Performance (Gráficos)
+O projeto inclui um módulo dedicado (Graficos.py) para comparar o desempenho dos agentes (Q-Learning vs Novelty) no mesmo cenário. Este script executa as simulações em segundo plano e gera gráficos comparativos de passos e recompensas.
+
+Configurar o Cenário de Teste
+Para escolher qual o problema e dificuldade a analisar, deve editar o final do ficheiro Graficos.py. Comente ou descomente as linhas conforme o desejado:
+
+    if __name__ == "__main__":
+    
+        # Exemplo 1: Comparar no Labirinto (Dificuldade: Médio)
+        #gerar_grafico_comparativo("labirinto", "medio")
+    
+        # Exemplo 2: Comparar no Farol (Dificuldade: Difícil)
+        gerar_grafico_comparativo("farol", "dificil")
