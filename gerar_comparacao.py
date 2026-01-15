@@ -71,4 +71,4 @@ if __name__ == "__main__":
     #gerar_grafico_comparativo("labirinto", "dificil")
 
     # Cenário 2: Farol Difícil
-    gerar_grafico_comparativo("farol", "dificil")
+    gerar_grafico_comparativo("labirinto", "dificil")
