@@ -1,5 +1,4 @@
 import time
-# Importar as classes dos outros ficheiros
 from Ambiente_Labirinto import AmbienteLabirinto
 from Agente_Labirinto import AgenteLabirinto
 from Ambiente_Farol import AmbienteFarol
@@ -10,7 +9,7 @@ from Sensor import Sensor
 try:
     from Pygame_Simulador import VisualizadorPygame
 except ImportError:
-    print("Aviso: Pygame não instalado. Instale com 'pip install pygame' para ter GUI.")
+    print("Aviso: Pygame não instalado.")
     VisualizadorPygame = None
 
 
@@ -19,20 +18,24 @@ class Simulador:
         self.ambiente = None
         self.agente = None
         self.passos = 0
-        self.max_passos = 500  # Aumentado para dificuldades maiores
+        self.max_passos = 500
         self.modo = ""
         self.visualizador = None
         self.fps = 10
+        self.sensor = None
+        self.dificuldade_atual = "facil"
 
     def cria(self, tipo_problema, dificuldade="facil", algoritmo="qlearning"):
         self.modo = tipo_problema
-        self.dificuldade_atual = dificuldade # Importante para a GUI
+        self.dificuldade_atual = dificuldade
 
-        # 1. Carregar Ambiente
         if tipo_problema == "farol":
             print(f"-> Farol ({dificuldade}) | Agente: {algoritmo}")
             self.ambiente = AmbienteFarol(mapa_tipo=dificuldade)
-            obs_inicial = self.ambiente.observacaoPara() # Obs original (será filtrada depois)
+
+            # CORREÇÃO 1: Formato correto na criação
+            vetor_inicial = self.ambiente.observacaoPara()
+            obs_inicial = (vetor_inicial, (0, 0, 0, 0))
 
         elif tipo_problema == "labirinto":
             print(f"-> Labirinto ({dificuldade}) | Agente: {algoritmo}")
@@ -42,16 +45,13 @@ class Simulador:
         else:
             raise Exception("Problema desconhecido.")
 
-        # --- NOVO: Inicializar o Sensor ---
         self.sensor = Sensor(self.ambiente, dificuldade)
-        # ----------------------------------
 
-        # 2. Configurar Agente
         if algoritmo == "novelty":
             self.agente = AgenteNovelty()
             self.max_passos = 2000
             if tipo_problema == "farol":
-                self.agente.observacao(obs_inicial)
+                self.agente.observacao(self.ambiente.agente_pos)
             elif tipo_problema == "labirinto":
                 self.agente.atualiza_posicao(obs_inicial)
 
@@ -63,11 +63,12 @@ class Simulador:
             elif tipo_problema == "labirinto":
                 self.agente = AgenteLabirinto()
                 self.agente.atualiza_posicao(obs_inicial)
-                # Ajuste para labirinto dificil
-                if dificuldade == "dificil": self.max_passos = 500
-                else: self.max_passos = 200
+                if dificuldade == "dificil":
+                    self.max_passos = 500
+                else:
+                    self.max_passos = 200
         else:
-             raise Exception(f"Algoritmo '{algoritmo}' não reconhecido.")
+            raise Exception(f"Algoritmo '{algoritmo}' não reconhecido.")
 
         if self.visualizador:
             self.visualizador.fechar()
@@ -76,114 +77,87 @@ class Simulador:
     def executa_episodio(self, renderizar=False):
         self.passos = 0
         terminou = False
-
-        # Reset do ambiente
         self.ambiente.reset()
         self.agente.recompensa_acumulada = 0
 
-        # --- PREPARAÇÃO DO NOVELTY ---
-        # O Novelty precisa de limpar a memória de curto prazo a cada episódio
+        # --- PREPARAÇÃO / RESET ---
         if isinstance(self.agente, AgenteNovelty):
             self.agente.observacao(self.ambiente.agente_pos)
             self.agente.historico_recente = []
             self.agente.ja_agiu = False
+            self.agente.objetivo_detectado = None
         else:
-            # Preparação Q-Learning (Reset posições iniciais)
             if self.modo == "labirinto":
                 self.agente.atualiza_posicao(self.ambiente.agente_pos)
             elif self.modo == "farol":
-                # Nota: A observação inicial do Farol será atualizada logo no loop
-                # mas convém inicializar para evitar erros
-                self.agente.observacao(self.ambiente.observacaoPara())
+                # --- CORREÇÃO 2: Formato correto no Reset ---
+                # AQUI ESTAVA O ERRO. Tem de ser Tupla, não apenas vetor.
+                v_ini = self.ambiente.observacaoPara()
+                self.agente.observacao((v_ini, (0, 0, 0, 0)))
+                # --------------------------------------------
 
-        # --- INICIALIZAR PYGAME ---
         if renderizar and VisualizadorPygame:
             dif = getattr(self, "dificuldade_atual", "N/A")
             nome_agente = "Novelty" if isinstance(self.agente, AgenteNovelty) else "Q-Learning"
+            self.visualizador = VisualizadorPygame(self.ambiente, self.modo, self.max_passos, self.fps, dif,
+                                                   nome_agente)
 
-            self.visualizador = VisualizadorPygame(
-                self.ambiente,
-                self.modo,
-                self.max_passos,
-                self.fps,
-                dif,
-                nome_agente
-            )
-
-        # --- LOOP DO EPISÓDIO ---
         while not terminou and self.passos < self.max_passos:
-
-            # 1. CONSULTAR O SENSOR (Onde está o objetivo?)
             pos_objetivo = self.sensor.get_posicao_objetivo()
 
-            # 2. ATUALIZAR VISUALIZADOR (Desenha o "Laser" se o sensor vir o objetivo)
             if self.visualizador:
                 sucesso = self.ambiente.jogo_terminou()
-                self.visualizador.desenha(
-                    self.passos,
-                    self.agente.recompensa_acumulada,
-                    terminou,
-                    sucesso,
-                    self.agente.epsilon,
-                    sensor_alvo=pos_objetivo  # <--- Passamos o alvo para desenhar a linha
-                )
+                self.visualizador.desenha(self.passos, self.agente.recompensa_acumulada, terminou, sucesso,
+                                          self.agente.epsilon, sensor_alvo=pos_objetivo)
 
-            # 3. PERCEPÇÃO (O que o Agente "Vê")
+            # PERCEPÇÃO
             if isinstance(self.agente, AgenteNovelty):
-                # --- ALTERAÇÃO AQUI ---
-                # Passamos a posição do agente E a posição do objetivo (se visível)
                 self.agente.observacao(self.ambiente.agente_pos, alvo=pos_objetivo)
 
             elif isinstance(self.agente, AgenteFarol):
-                # O Agente Farol precisa de saber a Direção (Vetor)
+                # Calcular Vector
+                obs_vector = None
                 if pos_objetivo is not None:
-                    # Sensor vê o farol -> Calculamos o vetor (dx, dy)
                     ax, ay = self.ambiente.agente_pos
                     fx, fy = pos_objetivo
-                    obs = (fx - ax, fy - ay)
-                else:
-                    # Sensor não vê nada -> Agente fica cego (None)
-                    obs = None
+                    obs_vector = (fx - ax, fy - ay)
 
-                self.agente.observacao(obs)
+                # Calcular Obstáculos (Código do teu simulador)
+                ax, ay = self.ambiente.agente_pos
+                mapa = self.ambiente.mapa_obstaculos
+                max_y = len(mapa)
+                max_x = len(mapa[0])
+                vizinhos_bloqueados = []
+                check_dirs = [(0, -1), (0, 1), (-1, 0), (1, 0)]
+                for dx, dy in check_dirs:
+                    nx, ny = ax + dx, ay + dy
+                    if 0 <= nx < max_x and 0 <= ny < max_y:
+                        terreno = mapa[ny][nx]
+                        bloqueado = 1 if terreno in [1, 2] else 0
+                        vizinhos_bloqueados.append(bloqueado)
+                    else:
+                        vizinhos_bloqueados.append(1)
+
+                # Enviar Tupla
+                self.agente.observacao((obs_vector, tuple(vizinhos_bloqueados)))
 
             elif isinstance(self.agente, AgenteLabirinto):
-                # O Labirinto Q-Learning usa apenas a posição interna (já atualizada abaixo)
                 self.agente.observacao(None)
 
-            # 4. AÇÃO
             acao = self.agente.age()
-
-            # 5. EXECUÇÃO NO AMBIENTE
             recompensa = self.ambiente.agir(acao)
 
-            # 6. ATUALIZAÇÃO DO AGENTE
-            # Se for labirinto (Q-Learning), temos de dizer onde ele "aterrou"
             if self.modo == "labirinto" and not isinstance(self.agente, AgenteNovelty):
                 self.agente.atualiza_posicao(self.ambiente.agente_pos)
 
-            # Aprender (Update Q-Table ou Novelty Score)
             self.agente.avaliacaoEstadoAtual(recompensa)
-
-            if self.ambiente.jogo_terminou():
-                terminou = True
-
+            if self.ambiente.jogo_terminou(): terminou = True
             self.passos += 1
 
-        # --- FIM DO LOOP ---
-
         sucesso = self.ambiente.jogo_terminou()
-
-        # Desenho Final (Pausa para veres o resultado)
         if self.visualizador:
-            self.visualizador.desenha(
-                self.passos,
-                self.agente.recompensa_acumulada,
-                terminou,
-                sucesso,
-                self.agente.epsilon,
-                sensor_alvo=None  # Removemos a linha no fim
-            )
+            self.visualizador.desenha(self.passos, self.agente.recompensa_acumulada, terminou, sucesso,
+                                      self.agente.epsilon, sensor_alvo=None)
             time.sleep(0.5)
             self.visualizador.fechar()
             self.visualizador = None
@@ -195,61 +169,38 @@ class Simulador:
             print("Erro: Tens de correr sim.cria() primeiro!")
             return
 
-        # --- FASE 1: APRENDIZAGEM ---
         print(f"\n>>> INÍCIO DO TREINO ({episodios_treino} episódios)")
-        print(f"    Modo: Learning=TRUE | Epsilon=Dinâmico")
-
-        # Garantir que o agente está configurado para aprender
         self.agente.learning_mode = True
-        # (O epsilon já está alto por defeito no init do agente)
 
         for episodio in range(1, episodios_treino + 1):
-            # Renderizar apenas o último episódio do treino para confirmares que ele aprendeu
-            render = (episodio == episodios_treino)
-
+            render = (episodio == episodios_treino)  # 1ª Visualização (Fim Treino)
             sucesso, passos, recompensa = self.executa_episodio(renderizar=render)
-
-            # Logs periódicos para saberes que não encravou
             if episodio % 100 == 0:
                 print(f"   [Treino] Ep {episodio}/{episodios_treino} | Passos: {passos} | Rec: {recompensa:.1f}")
 
-        # --- O SWITCH (MUDANÇA DE MODO) ---
         print("\n>>> FIM DO TREINO. A MUDAR PARA MODO DE TESTE...")
-        self.agente.learning_mode = False  # Para de atualizar a Q-Table/Memória [cite: 85]
-        self.agente.epsilon = 0.0  # Para de explorar (Greedy puro)
+        self.agente.learning_mode = False
+        self.agente.epsilon = 0.0
 
-        # --- FASE 2: TESTE / AVALIAÇÃO ---
         print(f">>> INÍCIO DO TESTE ({episodios_teste} episódios)")
-        print(f"    Modo: Learning=FALSE | Epsilon=0.0")
-
         sucessos_teste = 0
         total_passos_teste = 0
 
         for episodio in range(1, episodios_teste + 1):
-            # No teste, podes querer ver mais vezes, ou apenas o último
-            render = (episodio == episodios_teste)
-
+            render = (episodio == episodios_teste)  # 2ª Visualização (Fim Teste)
             sucesso, passos, recompensa = self.executa_episodio(renderizar=render)
-
-            if sucesso:
-                sucessos_teste += 1
+            if sucesso: sucessos_teste += 1
             total_passos_teste += passos
 
-        # --- RESULTADOS FINAIS ---
         taxa = (sucessos_teste / episodios_teste) * 100
         media_passos = total_passos_teste / episodios_teste
-
-        print("\n" + "=" * 40)
-        print(f"RESULTADOS FINAIS ({self.modo.upper()}):")
+        print(f"\nRESULTADOS FINAIS ({self.modo.upper()}):")
         print(f"Taxa de Sucesso: {taxa:.1f}%")
         print(f"Média de Passos: {media_passos:.1f}")
-        print("=" * 40)
 
 
-# Exemplo de uso:
 if __name__ == "__main__":
     sim = Simulador()
-    #sim.cria("farol", "dificil", "novelty")
-    sim.cria("farol", "dificil", "qlearning")
+    sim.cria("labirinto", "medio", "qlearning")
     sim.fps = 10
     sim.executa(episodios_treino=1000, episodios_teste=100)
